@@ -457,7 +457,7 @@ def stopSnapcast(signalNumber, frame):
 def parse_config(debugmode=False):
     config = configparser.ConfigParser()
     try:
-        with open("/etc/snapcastclient.conf") as f:
+        with open("/etc/snapcastmpris.conf") as f:
             config.read_string("[snapcast]\n" + f.read())
         logging.info("read /etc/snapcastclient.conf")
     except:
@@ -465,7 +465,7 @@ def parse_config(debugmode=False):
         config = {"general": {}}
 
     # Server to connect to
-    server = config.get("sncapcast", "server", fallback=None)
+    server = config.get("snapcast", "server")
     snapcastWrapper = SnapcastWrapper(server)
 
     # Auto start for snapcast
