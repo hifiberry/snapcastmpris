@@ -32,6 +32,8 @@ import sys
 import logging
 import time
 import threading
+import fcntl
+import os
 
 import subprocess
 
@@ -44,7 +46,7 @@ try:
 except ImportError:
     import glib as GLib
 
-identity = "LMS client"
+identity = "Snapcast client"
 
 PLAYBACK_STOPPED = "stopped"
 PLAYBACK_PAUSED = "pause"
@@ -160,8 +162,18 @@ MPRIS2_INTROSPECTION = """<node name="/org/mpris/MediaPlayer2">
 </node>"""
 
 
+def non_block_read(output):
+    fd = output.fileno()
+    fl = fcntl.fcntl(fd, fcntl.F_GETFL)
+    fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+    try:
+        return output.read()
+    except:
+        return ""
+
+
 class SnapcastWrapper(threading.Thread):
-    """ Wrapper to handle all communications with LMS
+    """ Wrapper to handle snapcastclient
     """
 
     def __init__(self, snapcastserver):
@@ -185,26 +197,32 @@ class SnapcastWrapper(threading.Thread):
             self.mainloop()
 
         except Exception as e:
-            logging.error("Snapcastwrapper thread died: %s", e)
+            logging.error("Snapcastwrapper thread exception: %s", e)
             sys.exit(1)
+
+        logging.error("Snapcastwrapper thread died - this should not happen")
+        sys.exit(1)
 
     def mainloop(self):
         current_playback_status = None
         while True:
             if self.playback_status != current_playback_status:
+                current_playback_status = self.playback_status
+
                 # Changed - do something
 
                 if self.playback_status == PLAYBACK_PLAYING:
                     if self.snapcastclient is None:
+                        logging.info("pausing other players")
+                        # TODO: system pause-all
                         logging.info("starting snapcastclient")
                         self.snapcastclient = \
-                            subprocess.run(["/bin/snapclient",
-                                            "-h", self.server,
-                                            "-e"],
-                                           stdout=subprocess.PIPE,
-                                           stderr=subprocess.PIPE,
-                                           shell=True,
-                                           check=False)
+                            subprocess.Popen("/bin/snapclient -h {} -e".format(self.server),
+                                              stdout=subprocess.PIPE,
+                                              stderr=subprocess.PIPE,
+                                              shell=True)
+                        logging.info("snapcastclient now running in background")
+
                     else:
                         logging.error("snapcast process seems to be running already")
 
@@ -213,19 +231,29 @@ class SnapcastWrapper(threading.Thread):
                     if self.snapcastclient is None:
                         logging.info("No snapcast client running, doing nothing")
                     else:
+                        logging.info("Killing snapcast client, doing nothing")
                         self.snapcastclient.kill()
                         # Wait until it died
                         _outs, _errs = self.snapcastclient.communicate()
                         self.snapcastclient = None
 
-            current_playback_status = self.playback_status
-            time.sleep(1)
+            # Check if snapcast is still running
+            if self.snapcastclient:
+                if self.snapcastclient.poll() is not None:
+                    logging.warning("snapclient died")
+                    self.playback_status = PLAYBACK_STOPPED
+                    self.snapcastclient = None
 
-    def send_command(self, cmd):
-        """
-        send commands like play, pause, ...
-        """
-        pass
+            if self.snapcastclient:
+                stdout = non_block_read(self.snapcastclient.stdout)
+                if stdout:
+                    logging.debug("stdout: %s", stdout)
+
+                stderr = non_block_read(self.snapcastclient.stderr)
+                if stderr:
+                    logging.info("stderr: %s", stderr)
+
+            time.sleep(0.2)
 
     def notify_status(self):
         """
@@ -254,7 +282,7 @@ class MPRISInterface(dbus.service.Object):
     def __init__(self):
         dbus.service.Object.__init__(self, dbus.SystemBus(),
                                      MPRISInterface.PATH)
-        self.name = "org.mpris.MediaPlayer2.lms"
+        self.name = "org.mpris.MediaPlayer2.snapcast"
         self.bus = dbus.SystemBus()
         self.uname = self.bus.get_unique_name()
         self.dbus_obj = self.bus.get_object("org.freedesktop.DBus",
@@ -290,7 +318,7 @@ class MPRISInterface(dbus.service.Object):
     ROOT_PROPS = {
         "CanQuit": (False, None),
         "CanRaise": (False, None),
-        "DesktopEntry": ("lmsmpris", None),
+        "DesktopEntry": ("snapcastmpris", None),
         "HasTrackList": (False, None),
         "Identity": (identity, None),
         "SupportedUriSchemes": (dbus.Array(signature="s"), None),
@@ -302,29 +330,20 @@ class MPRISInterface(dbus.service.Object):
         return MPRIS2_INTROSPECTION
 
     def get_playback_status():
-        status = lms_wrapper.playback_status
+        status = snapcast_wrapper.playback_status
         return {PLAYBACK_PLAYING: 'Playing',
                 PLAYBACK_PAUSED: 'Paused',
                 PLAYBACK_STOPPED: 'Stopped',
                 PLAYBACK_UNKNOWN: 'Unknown'}[status]
 
     def get_metadata():
-        return dbus.Dictionary(lms_wrapper.metadata, signature='sv')
-
-#     def __get_position():
-#         status = lms_wrapper.last_status()
-#         if 'time' in status:
-#             current, end = status['time'].split(':')
-#             return dbus.Int64((int(current) * 1000000))
-#         else:
-#             return dbus.Int64(0)
+        return dbus.Dictionary(snapcast_wrapper.metadata, signature='sv')
 
     PLAYER_INTERFACE = "org.mpris.MediaPlayer2.Player"
     PLAYER_PROPS = {
         "PlaybackStatus": (get_playback_status, None),
         "Rate": (1.0, None),
         "Metadata": (get_metadata, None),
-        #        "Position": (__get_position, None),
         "MinimumRate": (1.0, None),
         "MaximumRate": (1.0, None),
         "CanGoNext": (False, None),
@@ -432,14 +451,14 @@ if __name__ == '__main__':
     try:
         snapcast_wrapper = SnapcastWrapper(server)
         snapcast_wrapper.start()
-        logging.info("LMS poller thread started")
+        logging.info("Snapcast wrapper thread started")
     except dbus.exceptions.DBusException as e:
         logging.error("DBUS error: %s", e)
         sys.exit(1)
 
     time.sleep(2)
     if not (snapcast_wrapper.is_alive()):
-        logging.error("LMS connector thread died, exiting")
+        logging.error("Snapcast connector thread died, exiting")
         sys.exit(1)
 
     # Run idle loop
