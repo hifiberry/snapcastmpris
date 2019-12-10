@@ -237,6 +237,11 @@ class SnapcastWrapper(threading.Thread):
                         _outs, _errs = self.snapcastclient.communicate()
                         self.snapcastclient = None
 
+                # Playback status has changed, now inform DBUS
+                self.update_metadata()
+                self.dbus_service.update_property('org.mpris.MediaPlayer2.Player',
+                                                  'PlaybackStatus')
+
             # Check if snapcast is still running
             if self.snapcastclient:
                 if self.snapcastclient.poll() is not None:
@@ -255,21 +260,16 @@ class SnapcastWrapper(threading.Thread):
 
             time.sleep(0.2)
 
-    def notify_status(self):
-        """
-        No metadata support at the moment
-        """
+    def update_metadata(self):
+        metadata = {}
 
-    def last_status(self):
-        if time.time() - self._time >= 2:
-            self.timer_callback()
-        return self._status.copy()
+        if self.snapcastclient is not None:
+            metadata["xesam:url"] = "snapcast://" + self.server
 
-    def _update_properties(self, force=False):
-        pass
+        self.metadata = metadata
 
-        #   self._dbus_service.update_property('org.mpris.MediaPlayer2.Player',
-        #                                      'PlaybackStatus')
+        self.dbus_service.update_property('org.mpris.MediaPlayer2.Player',
+                                                  'Metadata')
 
 
 class MPRISInterface(dbus.service.Object):
@@ -391,7 +391,7 @@ class MPRISInterface(dbus.service.Object):
         return read_props
 
     def update_property(self, interface, prop):
-        getter, _setter = self.__prop_mapping[interface][prop]
+        getter, _setter = self.PROP_MAPPING[interface][prop]
         if callable(getter):
             value = getter()
         else:
