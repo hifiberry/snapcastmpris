@@ -217,7 +217,7 @@ class SnapcastWrapper(threading.Thread):
                 if self.playback_status == PLAYBACK_PLAYING:
                     if self.snapcastclient is None:
                         logging.info("pausing other players")
-                        # TODO: system pause-all
+                        subprocess.run(["/opt/hifiberry/bin/pause-all", "snapcast"])
                         logging.info("starting snapcastclient")
                         if self.server is not None:
                             serveroption = "-h " + self.server
