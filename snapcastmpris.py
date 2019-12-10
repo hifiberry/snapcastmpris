@@ -34,8 +34,10 @@ import time
 import threading
 import fcntl
 import os
-
 import subprocess
+import json
+import signal
+import configparser
 
 import dbus.service
 from dbus.mainloop.glib import DBusGMainLoop
@@ -189,6 +191,7 @@ class SnapcastWrapper(threading.Thread):
         self.received_data = False
 
         self.snapcastclient = None
+        self.streamname = ""
 
     def run(self):
         try:
@@ -216,8 +219,12 @@ class SnapcastWrapper(threading.Thread):
                         logging.info("pausing other players")
                         # TODO: system pause-all
                         logging.info("starting snapcastclient")
+                        if self.server is not None:
+                            serveroption = "-h " + self.server
+                        else:
+                            serveroption = ""
                         self.snapcastclient = \
-                            subprocess.Popen("/bin/snapclient -h {} -e".format(self.server),
+                            subprocess.Popen("/bin/snapclient -e {}".format(serveroption),
                                               stdout=subprocess.PIPE,
                                               stderr=subprocess.PIPE,
                                               shell=True)
@@ -256,17 +263,29 @@ class SnapcastWrapper(threading.Thread):
 
                 stderr = non_block_read(self.snapcastclient.stderr)
                 if stderr:
+                    self.parse_stderr(stderr)
                     logging.info("stderr: %s", stderr)
 
             time.sleep(0.2)
 
+    def parse_stderr(self, data):
+        updated = False
+        s = data.decode("utf-8")
+        for line in s.splitlines():
+            if line.startswith("metadata:"):
+                _attrib, mds = line.split(":", 1)
+                md = json.loads(mds)
+                if "STREAM" in md:
+                    self.streamname = md["STREAM"]
+                    updated = True
+
+        if updated:
+            self.update_metadata()
+
     def update_metadata(self):
-        metadata = {}
-
         if self.snapcastclient is not None:
-            metadata["xesam:url"] = "snapcast://" + self.server
-
-        self.metadata = metadata
+            self.metadata["xesam:url"] = \
+                "snapcast://{}/{}".format(self.server, self.streamname)
 
         self.dbus_service.update_property('org.mpris.MediaPlayer2.Player',
                                                   'Metadata')
@@ -430,6 +449,32 @@ class MPRISInterface(dbus.service.Object):
         return
 
 
+def stopSnapcast(signalNumber, frame):
+    logging.info("received USR1, stopping snapcast")
+    snapcast_wrapper.playback_status = PLAYBACK_STOPPED
+
+
+def parse_config(debugmode=False):
+    config = configparser.ConfigParser()
+    try:
+        with open("/etc/snapcastclient.conf") as f:
+            config.read_string("[snapcast]\n" + f.read())
+        logging.info("read /etc/snapcastclient.conf")
+    except:
+        logging.info("can't read /etc/snapcastclient.conf, using default configurations")
+        config = {"general": {}}
+
+    # Server to connect to
+    server = config.get("sncapcast", "server", fallback=None)
+    snapcastWrapper = SnapcastWrapper(server)
+
+    # Auto start for snapcast
+    if config.getboolean("snapcast", "autostart", fallback=True):
+        snapcastWrapper.playback_status = PLAYBACK_PLAYING
+
+    return snapcastWrapper
+
+
 if __name__ == '__main__':
     DBusGMainLoop(set_as_default=True)
 
@@ -445,11 +490,13 @@ if __name__ == '__main__':
     # Set up the main loop
     loop = GLib.MainLoop()
 
+    signal.signal(signal.SIGUSR1, stopSnapcast)
+
     server = "192.168.30.110"
 
     # Create wrapper to handle connection failures with MPD more gracefully
     try:
-        snapcast_wrapper = SnapcastWrapper(server)
+        snapcast_wrapper = parse_config()
         snapcast_wrapper.start()
         logging.info("Snapcast wrapper thread started")
     except dbus.exceptions.DBusException as e:
