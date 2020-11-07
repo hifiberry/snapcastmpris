@@ -39,6 +39,8 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
         self.start_snapclient_process()
         self.stream_name = ""
 
+        self.manual_pause = False
+
     def run(self):
         try:
             self.mainloop()
@@ -92,6 +94,9 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
 
     def pause_playback(self):
         self.playback_status = PLAYBACK_PAUSED
+        # This prevents snapcast from switching to play again after a second
+        # Snapcast will only auto-play after the snapcast source has been paused on the server
+        self.manual_pause = True
         self.rpc_wrapper.mute()
         self.update_dbus()
 
@@ -135,10 +140,15 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
 
     def on_snapserver_stream_pause(self):
         self.pause_playback()
+        self.manual_pause = False
         pass
 
     def on_snapserver_stream_start(self, stream_name):
         self.stream_name = stream_name
+        if self.manual_pause:
+            # This prevents snapcast from switching to play again after a second
+            # Snapcast will only auto-play after the snapcast source has been paused on the server
+            return
         self.start_playback()
 
     def on_snapserver_volume_change(self, volume_level):

@@ -55,7 +55,7 @@ class SnapcastRpcWrapper:
         self.set_muted(True)
 
     def set_muted(self, is_muted):
-        logging.info("Setting snapclient mute to " + str(is_muted))
+        logging.debug("Setting snapclient mute to " + str(is_muted))
         payload = \
             {"id": REQ_TAG_SET_MUTE,
              "jsonrpc": "2.0",
