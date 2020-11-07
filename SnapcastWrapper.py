@@ -60,11 +60,11 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
 
     def start_playback(self):
         self.playback_status = PLAYBACK_PLAYING
+        self.pause_other_players()
         if self.snapclient is None:
-            self.pause_other_players()
             self.start_snapclient_process()
         else:
-            logging.error("snapcast process seems to be running already")
+            logging.info("snapcast process is already running")
         self.update_dbus()
         # Give snapclient a bit of time to register with the server
         time.sleep(0.5)
@@ -157,6 +157,7 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
 
     def on_snapserver_mute(self):
         self.playback_status = PLAYBACK_PAUSED
+        logging.info("Snapclient muted, reporting deactivation")
         subprocess.run(["/opt/hifiberry/bin/report-deactivation",
                         "playercontrol_player_snapcast"])
         pass
