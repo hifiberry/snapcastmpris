@@ -33,21 +33,27 @@ import logging
 import time
 import signal
 import configparser
-import SnapcastWrapper
-import SnapcastMPRISInterface
+from SnapcastWrapper import SnapcastWrapper
 
 import dbus.service
 from dbus.mainloop.glib import DBusGMainLoop
 
 try:
     from gi.repository import GLib
+
     using_gi_glib = True
 except ImportError:
     import glib as GLib
 
-def stopSnapcast(signalNumber, frame):
+
+def stop_snapcast(signalNumber, frame):
     logging.info("received USR1, stopping snapcast")
-    snapcast_wrapper.stopPlayback()
+    snapcast_wrapper.stop_playback()
+
+
+def pause_snapcast(signalNumber, frame):
+    logging.info("received USR2, pausing snapcast")
+    snapcast_wrapper.pause_playback()
 
 
 def read_config():
@@ -77,7 +83,8 @@ if __name__ == '__main__':
 
     # Set up the main loop
     glib_main_loop = GLib.MainLoop()
-    signal.signal(signal.SIGUSR1, stopSnapcast)
+    signal.signal(signal.SIGUSR1, pause_snapcast)
+    signal.signal(signal.SIGUSR2, stop_snapcast)
 
     # Create wrapper to handle connection failures with MPD more gracefully
     try:
@@ -89,7 +96,7 @@ if __name__ == '__main__':
 
         # Auto start for snapcast
         if config.getboolean("snapcast", "autostart", fallback=True):
-            snapcast_wrapper.startPlayback()
+            snapcast_wrapper.autostart_on_stream()
 
         # Start the wrapper
         snapcast_wrapper.start()
@@ -106,6 +113,11 @@ if __name__ == '__main__':
     # Run idle loop
     try:
         logging.info("main loop started")
-        loop.run()
+        glib_main_loop.run()
     except KeyboardInterrupt:
         logging.debug('Caught SIGINT, exiting.')
+    snapcast_wrapper.stop()
+    logging.info("Waiting for snapcast wrapper thread to exit")
+    snapcast_wrapper.join()
+    logging.info("All threads have exited")
+    exit(0)

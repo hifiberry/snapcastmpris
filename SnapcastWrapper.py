@@ -2,142 +2,167 @@ import sys
 import logging
 import time
 import threading
-import fcntl
-import os
 import subprocess
-import json
-import SnapcastMPRISInterface
+from SnapcastMPRISInterface import SnapcastMPRISInterface
+from SnapcastRpcListener import SnapcastRpcListener
+from SnapcastRpcWebsocketWrapper import SnapcastRpcWebsocketWrapper
+from SnapcastRpcWrapper import SnapcastRpcWrapper
+
+PLAYBACK_STOPPED = "stopped"
+PLAYBACK_PAUSED = "pause"
+PLAYBACK_PLAYING = "playing"
+PLAYBACK_UNKNOWN = "unkown"
 
 
-class SnapcastWrapper(threading.Thread):
-    """ Wrapper to handle snapcastclient
+class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
+    """ Wrapper to handle snapclient
     """
-    PLAYBACK_STOPPED = "stopped"
-    PLAYBACK_PAUSED = "pause"
-    PLAYBACK_PLAYING = "playing"
-    PLAYBACK_UNKNOWN = "unkown"
 
-    def __init__(self, glib_loop, server_ip):
+    def __init__(self, glib_loop, server_ip: str):
         super().__init__()
-        self.glib_loop = glib_loop
-        self.playerid = None
-        self.playback_status = "stopped"
+        self.name = "SnapcastWrapper"
+        self.keep_running = True
+
+        if server_ip is None or len(server_ip) == 0:
+            logging.critical("CANNOT START SNAPCAST WRAPPER WITHOUT VALID SERVER IP")
+            exit(1)
+
+        self.dbus_service = SnapcastMPRISInterface(self, glib_loop)
+        self.rpc_wrapper = SnapcastRpcWrapper(server_ip)
+        self.websocket_wrapper = SnapcastRpcWebsocketWrapper(server_ip, self)
+
+        self.playback_status = PLAYBACK_STOPPED
         self.metadata = {}
         self.server_ip = server_ip
 
-        self.dbus_service = None
-
-        self.bus = dbus.SessionBus()
-        self.received_data = False
-
-        self.snapcastclient = None
-        self.streamname = ""
+        self.snapclient = None
+        self.start_snapclient_process()
+        self.stream_name = ""
 
     def run(self):
         try:
-            self.dbus_service = SnapcastMPRISInterface(self, self.glib_loop)
             self.mainloop()
         except Exception as e:
-            logging.error("Snapcastwrapper thread exception: %s", e)
+            logging.error("SnapcastWrapper thread exception: %s", e)
             sys.exit(1)
 
-        logging.error("Snapcastwrapper thread died - this should not happen")
-        sys.exit(1)
+        if self.keep_running:
+            logging.error("SnapcastWrapper thread died - this should not happen")
+            sys.exit(1)
+        else:
+            logging.info("SnapcastWrapper thread has exited")
 
-    def stop_playback(self):
-        self.playback_status = SnapcastWrapper.PLAYBACK_STOPPED
+    def stop(self):
+        self.websocket_wrapper.stop()
+        self.keep_running = False
 
     def start_playback(self):
-        self.playback_status = SnapcastWrapper.PLAYBACK_PLAYING
+        self.playback_status = PLAYBACK_PLAYING
+        if self.snapclient is None:
+            self.pause_other_players()
+            self.start_snapclient_process()
+        else:
+            logging.error("snapcast process seems to be running already")
+        self.update_dbus()
+        # Give snapclient a bit of time to register with the server
+        time.sleep(0.5)
+        self.rpc_wrapper.unmute()
+
+    def autostart_on_stream(self):
+        self.playback_status = PLAYBACK_PAUSED
+        self.start_snapclient_process()
+        self.update_dbus()
+
+    def pause_other_players(self):
+        logging.info("pausing other players")
+        subprocess.run(["/opt/hifiberry/bin/pause-all", "snapcast"])
+
+    def start_snapclient_process(self):
+        logging.info("starting Snapclient")
+        if self.server_ip is not None:
+            server_ip_flag = "-h " + self.server_ip
+        else:
+            server_ip_flag = ""
+        self.snapclient = \
+            subprocess.Popen(f"/bin/snapclient -e {server_ip_flag}",
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL,
+                             shell=True)
+        logging.info("snapclient now running in background")
+
+    def pause_playback(self):
+        self.playback_status = PLAYBACK_PAUSED
+        self.rpc_wrapper.mute()
+        self.update_dbus()
+
+    def stop_playback(self):
+        self.playback_status = PLAYBACK_STOPPED
+        # Not playing: kill client
+        if self.snapclient is None:
+            logging.info("No snapclient running, doing nothing")
+        else:
+            logging.info("Killing snapclient, doing nothing")
+            self.snapclient.kill()
+            # Wait until it died
+            time.sleep(0.25)
+            self.snapclient = None
+        self.update_dbus()
+
+    def update_dbus(self):
+        """
+        Update dbus after a change
+        """
+        # Playback status has changed, now inform DBUS
+        self.update_metadata()
+        self.dbus_service.update_property('org.mpris.MediaPlayer2.Player',
+                                          'PlaybackStatus')
+
+    def on_snapclient_died(self):
+        """
+        Called when the snapclient process has died
+        """
+        logging.warning("snapclient died")
+        self.playback_status = PLAYBACK_STOPPED
+        self.snapclient = None
 
     def mainloop(self):
-        current_playback_status = None
-        while True:
-            if self.playback_status != current_playback_status:
-                current_playback_status = self.playback_status
-
-                # Changed - do something
-                if self.playback_status == PLAYBACK_PLAYING:
-                    if self.snapcastclient is None:
-                        logging.info("pausing other players")
-                        subprocess.run(["/opt/hifiberry/bin/pause-all", "snapcast"])
-                        logging.info("starting snapcastclient")
-                        if self.server_ip is not None:
-                            serveroption = "-h " + self.server_ip
-                        else:
-                            serveroption = ""
-                        self.snapcastclient = \
-                            subprocess.Popen("/bin/snapclient -e {}".format(serveroption),
-                                             stdout=subprocess.PIPE,
-                                             stderr=subprocess.PIPE,
-                                             shell=True)
-                        logging.info("snapcastclient now running in background")
-
-                    else:
-                        logging.error("snapcast process seems to be running already")
-
-                else:
-                    # Not playing: kill client
-                    if self.snapcastclient is None:
-                        logging.info("No snapcast client running, doing nothing")
-                    else:
-                        logging.info("Killing snapcast client, doing nothing")
-                        self.snapcastclient.kill()
-                        # Wait until it died
-                        _outs, _errs = self.snapcastclient.communicate()
-                        self.snapcastclient = None
-
-                # Playback status has changed, now inform DBUS
-                self.update_metadata()
-                self.dbus_service.update_property('org.mpris.MediaPlayer2.Player',
-                                                  'PlaybackStatus')
-
+        while self.keep_running:
             # Check if snapcast is still running
-            if self.snapcastclient:
-                if self.snapcastclient.poll() is not None:
-                    logging.warning("snapclient died")
-                    self.playback_status = PLAYBACK_STOPPED
-                    self.snapcastclient = None
-
-            if self.snapcastclient:
-                stdout = non_block_read(self.snapcastclient.stdout)
-                if stdout:
-                    logging.debug("stdout: %s", stdout)
-
-                stderr = non_block_read(self.snapcastclient.stderr)
-                if stderr:
-                    self.parse_stderr(stderr)
-                    logging.info("stderr: %s", stderr)
-
+            if self.snapclient:
+                if self.snapclient.poll() is not None:
+                    self.on_snapclient_died()
             time.sleep(0.2)
 
-    def parse_stderr(self, data):
-        updated = False
-        s = data.decode("utf-8")
-        for line in s.splitlines():
-            if line.startswith("metadata:"):
-                _attrib, mds = line.split(":", 1)
-                md = json.loads(mds)
-                if "STREAM" in md:
-                    self.streamname = md["STREAM"]
-                    updated = True
+    def on_snapserver_stream_pause(self):
+        self.pause_playback()
+        pass
 
-        if updated:
-            self.update_metadata()
+    def on_snapserver_stream_start(self, stream_name):
+        self.stream_name = stream_name
+        self.start_playback()
+
+    def on_snapserver_volume_change(self, volume_level):
+        # TODO: synchronize with OS volume
+        pass
+
+    def on_snapserver_mute(self):
+        self.playback_status = PLAYBACK_PAUSED
+        subprocess.run(["/opt/hifiberry/bin/report-deactivation",
+                        "playercontrol_player_snapcast"])
+        pass
+
+    def on_snapserver_unmute(self):
+        if self.playback_status != PLAYBACK_PLAYING:
+            # If unmuted while a stream is playing, then treat this as
+            # "start playing" in case the wrapper isn't in the playin state
+            # already
+            # TODO: Check if a stream is playing
+            pass
 
     def update_metadata(self):
-        if self.snapcastclient is not None:
+        if self.snapclient is not None:
             self.metadata["xesam:url"] = \
-                "snapcast://{}/{}".format(self.server, self.streamname)
+                "snapcast://{}/{}".format(self.server_ip, self.stream_name)
 
         self.dbus_service.update_property('org.mpris.MediaPlayer2.Player',
                                           'Metadata')
-
-    def non_block_read(output):
-        fd = output.fileno()
-        fl = fcntl.fcntl(fd, fcntl.F_GETFL)
-        fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
-        try:
-            return output.read()
-        except:
-            return ""

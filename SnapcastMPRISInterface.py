@@ -217,7 +217,7 @@ class SnapcastMPRISInterface(dbus.service.Object):
     @dbus.service.method(PROP_INTERFACE,
                          in_signature="ss", out_signature="v")
     def Get(self, interface, prop):
-        getter, _setter = self.PROP_MAPPING[interface][prop]
+        getter, _setter = self.get_prop_mapping()[interface][prop]
         if callable(getter):
             return getter()
         return getter
@@ -225,7 +225,7 @@ class SnapcastMPRISInterface(dbus.service.Object):
     @dbus.service.method(PROP_INTERFACE,
                          in_signature="ssv", out_signature="")
     def Set(self, interface, prop, value):
-        _getter, setter = self.PROP_MAPPING[interface][prop]
+        _getter, setter = self.get_prop_mapping()[interface][prop]
         if setter is not None:
             setter(value)
 
@@ -233,7 +233,7 @@ class SnapcastMPRISInterface(dbus.service.Object):
                          in_signature="s", out_signature="a{sv}")
     def GetAll(self, interface):
         read_props = {}
-        props = self.PROP_MAPPING[interface]
+        props = self.get_prop_mapping()[interface]
         for key, (getter, _setter) in props.items():
             if callable(getter):
                 getter = getter()
@@ -241,7 +241,7 @@ class SnapcastMPRISInterface(dbus.service.Object):
         return read_props
 
     def update_property(self, interface, prop):
-        getter, _setter = self.PROP_MAPPING[interface][prop]
+        getter, _setter = self.get_prop_mapping()[interface][prop]
         if callable(getter):
             value = getter()
         else:
@@ -255,7 +255,6 @@ class SnapcastMPRISInterface(dbus.service.Object):
     def Pause(self):
         logging.debug("received DBUS pause")
         self.wrapper_instance.pause_playback()
-        return
 
     @dbus.service.method(PLAYER_INTERFACE, in_signature='', out_signature='')
     def PlayPause(self):
@@ -266,15 +265,13 @@ class SnapcastMPRISInterface(dbus.service.Object):
             self.wrapper_instance.pause_playback()
         else:
             self.wrapper_instance.start_playback()
-        return
 
     @dbus.service.method(PLAYER_INTERFACE, in_signature='', out_signature='')
     def Stop(self):
         logging.debug("received DBUS stop")
         self.wrapper_instance.stop_playback()
-        return
 
     @dbus.service.method(PLAYER_INTERFACE, in_signature='', out_signature='')
     def Play(self):
+        logging.debug("received DBUS play")
         self.wrapper_instance.start_playback()
-        return
