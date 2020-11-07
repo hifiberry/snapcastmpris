@@ -58,7 +58,7 @@ muted client will reduce network traffic, compared to a running process with ign
 SnapcastRpcWebsocketWrapper runs a websocket in a separate thread, and calls callback methods in SnapcastWrapper (a SnapcastRpcListener 
 implementation) to act on stream and client status changes. 
 
-- When muted, the status is set to paused and a hook in SnapcastWrapper is called in order to de-activate the player in HifiberryOS.
+- When muted, the status is set to paused
 - When unmuted, nothing is done. If a stream is already playing to the active device, and the player is in PAUSED mode, 
 the player should switch to playing. This has not been implemented yet.
 - When a stream switches from idle to playing, and the previous pause event was not caused by a DBUS event, SnapcastWrapper switches to the playing state.

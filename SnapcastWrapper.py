@@ -157,9 +157,6 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
 
     def on_snapserver_mute(self):
         self.playback_status = PLAYBACK_PAUSED
-        logging.info("Snapclient muted, reporting deactivation")
-        subprocess.run(["/opt/hifiberry/bin/report-deactivation",
-                        "playercontrol_player_snapcast"])
         pass
 
     def on_snapserver_unmute(self):
