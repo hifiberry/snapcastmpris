@@ -13,12 +13,13 @@ in a separate thread, is created.
 
 `SnapcastWrapper` has methods to start/pause/play snapcast audio, and keeps track of the _snapclient_ 
 process. It gets help from `SnapcastRpcWrapper`, which communicates with _snapserver_, the snapcast server.
-This communication with the _snapserver_ RPC API is used to control the snapcast audio level, mute status, client name.
-The `SnapcastRpcWebsocketWrapper` is used to receive events from the _snapserver_ RPC API. It receives information about
-the stream that is currently playing, such as the playing state and the name, and passes this on to the `SnapcastWrapper`.
-Volume level changes, muting of a client, client connects, disconnects, ... is handled by this websocket wrapper as well.
-`SnapcastMPRISInterface` is used to communicate through the DBUS, to receive play/pause/stop signals from the OS and to relay
-information about the current state back to the OS. 
+This communication with [the Snapserver RPC API](https://github.com/badaix/snapcast/blob/master/doc/json_rpc_api/v2_0_0.md)
+is used to control the snapcast audio level, mute status, client name. The `SnapcastRpcWebsocketWrapper` is used to receive 
+events from [the Snapserver RPC API](https://github.com/badaix/snapcast/blob/master/doc/json_rpc_api/v2_0_0.md). It receives 
+information about the stream that is currently playing, such as the playing state and the name, and passes this on to 
+the `SnapcastWrapper`. Volume level changes, muting of a client, client connects, disconnects, ... is handled by this 
+websocket wrapper as well. `SnapcastMPRISInterface` is used to communicate through the DBUS, to receive play/pause/stop 
+signals from the OS and to relay information about the current state back to the OS. 
 
 ## What SnapcastWrapper does
 SnapcastWrapper runs in a separate thread from the main script.
@@ -45,9 +46,10 @@ When stopping audio
 - SnapcastWrapper keeps running in order to act should a play signal come from DBUS or snapserver.
 
 ## What SnapcastRpcWrapper does
-SnapcastRpcWrapper is a helper class to SnapcastWrapper. It can mute and unmute the client, set the client volume, 
-change the client latency and change the client name. Through SnapcastRpcWrapper, the client information and server 
-information can be obtained.
+SnapcastRpcWrapper is a helper class to SnapcastWrapper, and provides access to 
+[the Snapserver RPC API](https://github.com/badaix/snapcast/blob/master/doc/json_rpc_api/v2_0_0.md). It can mute and 
+unmute the client, set the client volume, change the client latency and change the client name. Through
+SnapcastRpcWrapper, the client information and server information can be obtained.
 
 *The advantage of muting* is that snapserver can be configured not to send data to muted clients. This means that a 
 muted client will reduce network traffic, compared to a running process with ignored audio, or an audio level set to 0.
