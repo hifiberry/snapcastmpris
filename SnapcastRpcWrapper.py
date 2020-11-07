@@ -34,7 +34,7 @@ class SnapcastRpcWrapper:
              "jsonrpc": "2.0",
              "method": "Server.GetStatus",
              }
-        return self.call_snapserver_jsonrcp(payload)
+        return self.call_snapserver_jsonrcp(payload)["params"]
 
     def get_status(self):
         logging.info("Getting snapclient status")
@@ -44,7 +44,7 @@ class SnapcastRpcWrapper:
              "method": "Client.GetStatus",
              "params": {"id": self.client_id}
              }
-        return self.call_snapserver_jsonrcp(payload)
+        return self.call_snapserver_jsonrcp(payload)["params"]
 
     def unmute(self):
         logging.info("Unmuting snapclient")
