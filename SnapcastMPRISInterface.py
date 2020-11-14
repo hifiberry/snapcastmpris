@@ -191,7 +191,7 @@ class SnapcastMPRISInterface(dbus.service.Object):
             "CanPlay": (True, None),
             "CanPause": (True, None),
             "CanSeek": (False, None),
-            "CanControl": (False, None),
+            "CanControl": (True, None),
         }
 
         root_props = {

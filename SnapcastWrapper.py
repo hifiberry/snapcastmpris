@@ -171,6 +171,7 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
         if self.snapclient is not None:
             self.metadata["xesam:url"] = \
                 "snapcast://{}/{}".format(self.server_ip, self.stream_name)
+            self.metadata["xesam:title"] = self.stream_name
 
         self.dbus_service.update_property('org.mpris.MediaPlayer2.Player',
                                           'Metadata')
