@@ -14,15 +14,15 @@ REQ_TAG_GET_SERVER_STATUS = 6
 
 class SnapcastRpcWrapper:
 
-    def __init__(self, server_ip):
+    def __init__(self, server_address):
         """
         Create a new instance
 
-        :param:server_ip The ip of the snapcast server
+        :param:server_address The ip of the snapcast server
         :param:listener a SnapcastRpcListener listener
         """
         logging.debug("Initializing SnapcastRpcWrapper")
-        self.server_ip = server_ip
+        self.server_address = server_address
         self.client_id = SnapcastRpcWrapper.get_client_id()
         self.verify_srver_rpc_version()
         logging.debug("Initialized SnapcastRpcWrapper")
@@ -113,8 +113,8 @@ class SnapcastRpcWrapper:
             logging.warning("Update Snapserver to resolve this")
 
     def call_snapserver_jsonrcp(self, payload_data):
-        logging.debug("Sending JsonRPC call to Snapserver at " + self.server_ip)
-        response = requests.post('http://' + self.server_ip + ":1780/jsonrpc", json=payload_data)
+        logging.debug("Sending JsonRPC call to Snapserver at " + self.server_address)
+        response = requests.post('http://' + self.server_address + ":1780/jsonrpc", json=payload_data)
         logging.debug("JsonRCP response: " + response.text)
         return response.json()['result']
 

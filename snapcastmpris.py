@@ -34,6 +34,7 @@ import time
 import signal
 import configparser
 from SnapcastWrapper import SnapcastWrapper
+from zeroconf import Zeroconf
 
 import dbus.service
 from dbus.mainloop.glib import DBusGMainLoop
@@ -69,6 +70,17 @@ def read_config():
     return config
 
 
+def get_zeroconf_server_address():
+    zerocfg = Zeroconf()
+    service_info = zerocfg.get_service_info("_snapcast._tcp.local.", "Snapcast._snapcast._tcp.local.", 3000)
+    if service_info is None:
+        logging.error("Failed to obtain snapserver address through zeroconf!")
+        return None
+    logging.info("Obtained snapserver address through zeroconf: " + service_info.server)
+    # Remove the trailing dot, as it is invalid in a host with port number
+    return service_info.server.rstrip(".")
+
+
 if __name__ == '__main__':
     DBusGMainLoop(set_as_default=True)
 
@@ -91,7 +103,22 @@ if __name__ == '__main__':
         config = read_config()
 
         # Server to connect to
-        server_address = config.get("snapcast", "server")
+        server_address = None
+        if config.has_option("snapcast", "server"):
+            # Read the server address from the server if possible
+            server_address = config.get("snapcast", "server")
+        if server_address is None or len(server_address) < 2:
+            # No server address defined, use zeroconf
+            # Snapclient can do this as well when no host is specified, but we
+            # need the server address as well to access the API
+            # Getting it in one central place ensures we use the same address for
+            # snapclient, the snapserver API, and the snapserver WS API
+            server_address = get_zeroconf_server_address()
+        if server_address is None:
+            # If no address was defined, and zeroconf failed to get one, we can't launch
+            logging.critical("Snapcast cannot be launched: failed to obtain snapcast server address.")
+            exit(1)
+
         snapcast_wrapper = SnapcastWrapper(glib_main_loop, server_address)
 
         # Auto start for snapcast
@@ -105,6 +132,7 @@ if __name__ == '__main__':
         logging.error("DBUS error: %s", e)
         sys.exit(1)
 
+    # Wait a few seconds so the thread can start
     time.sleep(2)
     if not (snapcast_wrapper.is_alive()):
         logging.error("Snapcast connector thread died, exiting")

@@ -18,26 +18,23 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
     """ Wrapper to handle snapclient
     """
 
-    def __init__(self, glib_loop, server_ip: str):
+    def __init__(self, glib_loop, server_address: str):
         super().__init__()
         self.name = "SnapcastWrapper"
         self.keep_running = True
-
-        if server_ip is None or len(server_ip) == 0:
-            logging.critical("CANNOT START SNAPCAST WRAPPER WITHOUT VALID SERVER IP")
-            exit(1)
+        self.server_address = server_address
 
         self.dbus_service = SnapcastMPRISInterface(self, glib_loop)
-        self.rpc_wrapper = SnapcastRpcWrapper(server_ip)
-        self.websocket_wrapper = SnapcastRpcWebsocketWrapper(server_ip, self)
+        self.rpc_wrapper = SnapcastRpcWrapper(server_address)
+        self.websocket_wrapper = SnapcastRpcWebsocketWrapper(server_address, self)
 
         self.playback_status = PLAYBACK_STOPPED
         self.metadata = {}
-        self.server_ip = server_ip
 
         self.snapclient = None
         self.start_snapclient_process()
         self.stream_name = ""
+        self.stream_group = ""
 
         self.manual_pause = False
 
@@ -81,12 +78,12 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
 
     def start_snapclient_process(self):
         logging.info("starting Snapclient")
-        if self.server_ip is not None:
-            server_ip_flag = "-h " + self.server_ip
+        if self.server_address is not None:
+            server_address_flag = "-h " + self.server_address
         else:
-            server_ip_flag = ""
+            server_address_flag = ""
         self.snapclient = \
-            subprocess.Popen(f"/bin/snapclient -e {server_ip_flag}",
+            subprocess.Popen(f"/bin/snapclient -e {server_address_flag}",
                              stdout=subprocess.DEVNULL,
                              stderr=subprocess.DEVNULL,
                              shell=True)
@@ -143,8 +140,10 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
         self.manual_pause = False
         pass
 
-    def on_snapserver_stream_start(self, stream_name):
+    def on_snapserver_stream_start(self, stream_name, stream_group):
         self.stream_name = stream_name
+        self.stream_group = stream_group
+        self.update_metadata()
         if self.manual_pause:
             # This prevents snapcast from switching to play again after a second
             # Snapcast will only auto-play after the snapcast source has been paused on the server
@@ -170,7 +169,7 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
     def update_metadata(self):
         if self.snapclient is not None:
             self.metadata["xesam:url"] = \
-                "snapcast://{}/{}".format(self.server_ip, self.stream_name)
+                "snapcast://{}/{}".format(self.server_address, self.stream_name)
             self.metadata["xesam:title"] = self.stream_name
 
         self.dbus_service.update_property('org.mpris.MediaPlayer2.Player',

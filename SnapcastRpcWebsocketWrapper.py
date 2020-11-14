@@ -14,13 +14,13 @@ RPC_EVENT_STREAM_UPDATE = "Stream.OnUpdate"
 
 class SnapcastRpcWebsocketWrapper:
 
-    def __init__(self, server_ip: str, listener: SnapcastRpcListener):
+    def __init__(self, server_address: str, listener: SnapcastRpcListener):
         self.healthy = True
-        self.server_ip = server_ip
+        self.server_address = server_address
         self.client_id = SnapcastRpcWrapper.get_client_id()
         self.listener = listener
         self.websocket = websocket.WebSocketApp(
-            "ws://" + server_ip + ":1780/jsonrpc",
+            "ws://" + server_address + ":1780/jsonrpc",
             on_message=self.on_ws_message,
             on_error=self.on_ws_error,
             on_close=self.on_ws_close,
@@ -90,7 +90,7 @@ class SnapcastRpcWebsocketWrapper:
 
         # TODO: we need to know/check if the stream is played on this client
         # It might only be targeted at other players, in which case this player shouldn't do anything
-
+        stream_group = ""
         stream_status = params["stream"]["status"]
         # The stream name can be present in id, stream.id, or stream.meta.STREAM
         if "meta" in params["stream"]:
@@ -100,7 +100,7 @@ class SnapcastRpcWebsocketWrapper:
 
         if stream_status == "playing":
             logging.info("Snapclient stream started")
-            self.listener.on_snapserver_stream_start(stream_name)
+            self.listener.on_snapserver_stream_start(stream_name, stream_group)
         elif stream_status == "idle":
             logging.info("Snapclient stream idle")
             self.listener.on_snapserver_stream_pause()
