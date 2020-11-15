@@ -76,7 +76,7 @@ def get_zeroconf_server_address():
     if service_info is None:
         logging.error("Failed to obtain snapserver address through zeroconf!")
         return None
-    logging.critical(service_info)
+    logging.debug(service_info)
     address = service_info.parsed_addresses(IPVersion.All)[0]
     logging.info("Obtained snapserver address through zeroconf: " + address)
     return address
