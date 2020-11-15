@@ -34,7 +34,7 @@ import time
 import signal
 import configparser
 from SnapcastWrapper import SnapcastWrapper
-from zeroconf import Zeroconf
+from zeroconf import Zeroconf, IPVersion
 
 import dbus.service
 from dbus.mainloop.glib import DBusGMainLoop
@@ -76,9 +76,10 @@ def get_zeroconf_server_address():
     if service_info is None:
         logging.error("Failed to obtain snapserver address through zeroconf!")
         return None
-    logging.info("Obtained snapserver address through zeroconf: " + service_info.server)
-    # Remove the trailing dot, as it is invalid in a host with port number
-    return service_info.server.rstrip(".")
+    logging.critical(service_info)
+    address = service_info.parsed_addresses(IPVersion.All)[0]
+    logging.info("Obtained snapserver address through zeroconf: " + address)
+    return address
 
 
 if __name__ == '__main__':
