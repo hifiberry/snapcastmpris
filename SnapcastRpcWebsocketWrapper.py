@@ -19,6 +19,9 @@ class SnapcastRpcWebsocketWrapper:
         self.server_address = server_address
         self.client_id = SnapcastRpcWrapper.get_client_id()
         self.listener = listener
+
+        self.current_volume = None
+
         self.websocket = websocket.WebSocketApp(
             "ws://" + server_address + ":1780/jsonrpc",
             on_message=self.on_ws_message,
@@ -57,8 +60,13 @@ class SnapcastRpcWebsocketWrapper:
         if not self.targeted_at_current_client(params):
             return
         volume = params['volume']['percent']
+        # Don't trigger multiple times on the same volume
+        if volume == self.current_volume:
+            logging.debug("Snapclient volume update, but no change: " + str(volume))
+            return
         logging.info("Snapclient volume changed to " + str(volume))
         self.listener.on_snapserver_volume_change(volume)
+        self.current_volume = volume
 
     def on_mute(self, params: {}):
         if not self.targeted_at_current_client(params):

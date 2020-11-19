@@ -38,6 +38,7 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
         self.stream_name = ""
         self.stream_group = ""
 
+        self.current_volume = self.get_system_volume()
         self.alsa_poll_thread = threading.Thread(target=self.poll_system_volume_loop)
         self.alsa_poll_thread.name = "SnapcastWrapper ALSA Volume poll thread"
         self.manual_pause = False
@@ -187,17 +188,22 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
         while self.keep_running:
             # 1s is reasonably long, but still short enough to react quickly
             # in case keep_running changes.
-            poll_events = poll.poll(250)
+            poll_events = poll.poll(500)
             if poll_events:
-                logging.info("ALSA Volume changed - updating Snapserver")
                 volume = self.get_system_volume()
-                self.on_system_volume_change(volume)
+                if volume != self.current_volume:
+                    logging.info("ALSA Volume changed - updating Snapserver")
+                    self.on_system_volume_change(volume)
+                    self.current_volume = volume
         poll.unregister(descriptors)
         logging.info("SnapcastWrapper ALSA volume poll thread exited")
 
     def set_system_volume(self, volume_level):
+        if volume_level == self.get_system_volume():
+            return
         mixer = audio.Mixer('Softvol')
         mixer.setvolume(volume_level, audio.MIXER_CHANNEL_ALL, audio.PCM_PLAYBACK)
+        self.current_volume = volume_level
 
     def get_system_volume(self):
         mixer = audio.Mixer('Softvol')
