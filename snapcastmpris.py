@@ -85,11 +85,19 @@ def get_zeroconf_server_address():
 if __name__ == '__main__':
     DBusGMainLoop(set_as_default=True)
 
+    volume_sync_enabled = False
     if len(sys.argv) > 1:
         if "-v" in sys.argv:
             logging.basicConfig(format='%(levelname)s: %(name)s - %(message)s',
                                 level=logging.DEBUG)
             logging.debug("enabled verbose logging")
+        else:
+            logging.basicConfig(format='%(levelname)s: %(name)s - %(message)s',
+                                level=logging.INFO)
+
+        if "--sync-alsa-volume" in sys.argv:
+            logging.debug("Volume sync flag set")
+            volume_sync_enabled = True
     else:
         logging.basicConfig(format='%(levelname)s: %(name)s - %(message)s',
                             level=logging.INFO)
@@ -120,7 +128,7 @@ if __name__ == '__main__':
             logging.critical("Snapcast cannot be launched: failed to obtain snapcast server address.")
             exit(1)
 
-        snapcast_wrapper = SnapcastWrapper(glib_main_loop, server_address, sync_volume=True)
+        snapcast_wrapper = SnapcastWrapper(glib_main_loop, server_address, sync_volume=volume_sync_enabled)
 
         # Auto start for snapcast
         if config.getboolean("snapcast", "autostart", fallback=True):
@@ -133,7 +141,8 @@ if __name__ == '__main__':
         logging.error("DBUS error: %s", e)
         sys.exit(1)
 
-    # Wait a few seconds so the thread can start
+    # Wait a few seconds so the thread can start. Killing the application in
+    # these 2 seconds may cause unspecified behaviour
     time.sleep(2)
     if not (snapcast_wrapper.is_alive()):
         logging.error("Snapcast connector thread died, exiting")

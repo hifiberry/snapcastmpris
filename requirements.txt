@@ -1,4 +1,4 @@
 requests==2.*
 websocket-client>=0.57
 zeroconf>=0.28
-alsaaudio
+# alsaaudio is required when running with the --sync-alsa-volume flag.
