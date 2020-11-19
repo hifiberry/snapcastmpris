@@ -66,7 +66,7 @@ class SnapcastRpcWrapper:
         self.call_snapserver_jsonrcp(payload)
 
     def set_volume(self, volume_level):
-        logging.info("Setting snapclient volume level to " + volume_level)
+        logging.info("Setting snapclient volume level to " + str(volume_level))
         volume_level = min(volume_level, 100)
         volume_level = max(volume_level, 0)
         payload = \
@@ -75,7 +75,7 @@ class SnapcastRpcWrapper:
              "method": "Client.SetVolume",
              "params":
                  {"id": self.client_id,
-                  "volume": {"volume": volume_level}}}
+                  "volume": {"percent": volume_level}}}
         self.call_snapserver_jsonrcp(payload)
 
     def set_name(self, name):

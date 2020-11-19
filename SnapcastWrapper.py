@@ -3,6 +3,7 @@ import logging
 import time
 import threading
 import subprocess
+import select
 from SnapcastMPRISInterface import SnapcastMPRISInterface
 from SnapcastRpcListener import SnapcastRpcListener
 from SnapcastRpcWebsocketWrapper import SnapcastRpcWebsocketWrapper
@@ -18,7 +19,7 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
     """ Wrapper to handle snapclient
     """
 
-    def __init__(self, glib_loop, server_address: str):
+    def __init__(self, glib_loop, server_address: str, sync_volume=False):
         super().__init__()
         self.name = "SnapcastWrapper"
         self.keep_running = True
@@ -36,10 +37,24 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
         self.stream_name = ""
         self.stream_group = ""
 
+        self.sync_volume = sync_volume
+        if self.sync_volume:
+            # Import alsa only when needed, to ensure this code can still run on other platforms
+            import alsaaudio as alsa
+            self.alsa = alsa
+            self.current_volume = self.get_system_volume()
+            self.alsa_poll_thread = threading.Thread(target=self.poll_system_volume_loop)
+            self.alsa_poll_thread.name = "SnapcastWrapper ALSA Volume poll thread"
+
         self.manual_pause = False
 
     def run(self):
         try:
+            if self.sync_volume:
+                logging.info("ALSA <-> Snapcast volume synchronisation is enabled")
+                self.alsa_poll_thread.start()
+            else:
+                logging.info("ALSA <-> Snapcast volume synchronisation is disabled")
             self.mainloop()
         except Exception as e:
             logging.error("SnapcastWrapper thread exception: %s", e)
@@ -54,6 +69,8 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
     def stop(self):
         self.websocket_wrapper.stop()
         self.keep_running = False
+        if self.sync_volume:
+            self.alsa_poll_thread.join()
 
     def start_playback(self):
         self.playback_status = PLAYBACK_PLAYING
@@ -151,8 +168,12 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
         self.start_playback()
 
     def on_snapserver_volume_change(self, volume_level):
-        # TODO: synchronize with OS volume
-        pass
+        if self.sync_volume and volume_level > 0:
+            self.set_system_volume(volume_level)
+
+    def on_system_volume_change(self, volume_level):
+        if self.sync_volume:
+            self.rpc_wrapper.set_volume(volume_level)
 
     def on_snapserver_mute(self):
         self.playback_status = PLAYBACK_PAUSED
@@ -165,6 +186,40 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
             # already
             # TODO: Check if a stream is playing
             pass
+
+    def poll_system_volume_loop(self):
+        logging.info("SnapcastWrapper ALSA volume poll thread started")
+        mixer = self.alsa.Mixer('Softvol')
+        descriptors = mixer.polldescriptors()
+        fd = descriptors[0][0]
+        event_mask = descriptors[0][1]
+        poll = select.poll()
+        poll.register(fd, event_mask)
+        while self.keep_running:
+            # 1s is reasonably long, but still short enough to react quickly
+            # in case keep_running changes.
+            poll_events = poll.poll(500)
+            if poll_events:
+                volume = self.get_system_volume()
+                if volume != self.current_volume:
+                    logging.info("ALSA Volume changed - updating Snapserver")
+                    self.on_system_volume_change(volume)
+                    self.current_volume = volume
+        poll.unregister(fd)
+        logging.info("SnapcastWrapper ALSA volume poll thread exited")
+
+    def set_system_volume(self, volume_level):
+        if volume_level == self.get_system_volume():
+            return
+        # Import alsa locally to be system-independent
+
+        mixer = self.alsa.Mixer('Softvol')
+        mixer.setvolume(volume_level, self.alsa.MIXER_CHANNEL_ALL, self.alsa.PCM_PLAYBACK)
+        self.current_volume = volume_level
+
+    def get_system_volume(self):
+        mixer = self.alsa.Mixer('Softvol')
+        return mixer.getvolume(self.alsa.PCM_PLAYBACK)[0]
 
     def update_metadata(self):
         if self.snapclient is not None:

@@ -24,6 +24,10 @@ signals from the OS and to relay information about the current state back to the
 ## What SnapcastWrapper does
 SnapcastWrapper runs in a separate thread from the main script.
 SnapcastWrapper implements the SnapcastRpcListener class and methods, which are called by SnapcastRpcWebsocketWrapper.
+When ALSA <=> Snapclient volume synchronisation is enabled, SnapcastWrapper will monitor the ALSA volume level and send
+any changes to Snapserver through SnapcastRPCWrapper. Volume synchronisation is disabled by default and enabled through 
+the `--sync-alsa-volume` flag. It requires the `alsaaudio` library to be installed.
+
 ### Playing audio
 When playing audio
 - A Snapclient process is started 
@@ -52,7 +56,7 @@ unmute the client, set the client volume, change the client latency and change t
 SnapcastRpcWrapper, the client information and server information can be obtained.
 
 *The advantage of muting* is that snapserver can be configured not to send data to muted clients. This means that a 
-muted client will reduce network traffic, compared to a running process with ignored audio, or an audio level set to 0.
+muted client will reduce network traffic, compared to a running process with ignored audio.
 
 ## What SnapcastRpcWebsocketWrapper does
 SnapcastRpcWebsocketWrapper runs a websocket in a separate thread, and calls callback methods in SnapcastWrapper (a SnapcastRpcListener 
@@ -63,3 +67,4 @@ implementation) to act on stream and client status changes.
 the player should switch to playing. This has not been implemented yet.
 - When a stream switches from idle to playing, and the previous pause event was not caused by a DBUS event, SnapcastWrapper switches to the playing state.
 - When a stream switches from playing to idle, the SnapcastWrapper pause logic is triggered to mute the client and switch to the PAUSED state.
+- When the snapclient volume level is changed, and ALSA <=> Snapclient volume synchronisation is enabled, the ALSA volume is adjusted.
