@@ -120,7 +120,7 @@ if __name__ == '__main__':
             logging.critical("Snapcast cannot be launched: failed to obtain snapcast server address.")
             exit(1)
 
-        snapcast_wrapper = SnapcastWrapper(glib_main_loop, server_address)
+        snapcast_wrapper = SnapcastWrapper(glib_main_loop, server_address, sync_volume=True)
 
         # Auto start for snapcast
         if config.getboolean("snapcast", "autostart", fallback=True):

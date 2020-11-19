@@ -64,7 +64,7 @@ class SnapcastRpcWebsocketWrapper:
         if volume == self.current_volume:
             logging.debug("Snapclient volume update, but no change: " + str(volume))
             return
-        logging.info("Snapclient volume changed to " + str(volume))
+        logging.debug("Snapclient volume changed to " + str(volume))
         self.listener.on_snapserver_volume_change(volume)
         self.current_volume = volume
 
