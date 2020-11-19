@@ -205,7 +205,7 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
                     logging.info("ALSA Volume changed - updating Snapserver")
                     self.on_system_volume_change(volume)
                     self.current_volume = volume
-        poll.unregister(descriptors)
+        poll.unregister(fd)
         logging.info("SnapcastWrapper ALSA volume poll thread exited")
 
     def set_system_volume(self, volume_level):
