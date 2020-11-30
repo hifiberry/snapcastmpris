@@ -75,14 +75,26 @@ def get_zeroconf_server_address():
     service_info = zerocfg.get_service_info("_snapcast._tcp.local.",
                                             "Snapcast._snapcast._tcp.local.",
                                             3000)
-    logging.info(service_info)
     if service_info is None:
         logging.error("Failed to obtain snapserver address through zeroconf!")
         return None
     logging.debug(service_info)
-    address = service_info.parsed_addresses(IPVersion.All)[0]
-    logging.info("Obtained snapserver address through zeroconf: " + address)
-    return address
+    snapserver_address = None
+    all_addresses = service_info.parsed_addresses(IPVersion.V4Only)
+    for address in all_addresses:
+        if address != "0.0.0.0":
+            snapserver_address = address
+    if snapserver_address is None:
+        logging.critical("Failed to obtain snapserver address through zeroconf, got 0.0.0.0 but expected real address!")
+        logging.error(service_info)
+        logging.error(all_addresses)
+        return None
+    if len(all_addresses) > 1:
+        logging.warning("Got more than one zeroconf address, what's happening here?!")
+        logging.warning(service_info)
+        logging.warning(all_addresses)
+    logging.info("Obtained snapserver address through zeroconf: " + snapserver_address)
+    return snapserver_address
 
 
 if __name__ == '__main__':
