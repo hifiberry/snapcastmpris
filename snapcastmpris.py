@@ -72,7 +72,10 @@ def read_config():
 
 def get_zeroconf_server_address():
     zerocfg = Zeroconf()
-    service_info = zerocfg.get_service_info("_snapcast._tcp.local.", "Snapcast._snapcast._tcp.local.", 3000)
+    service_info = zerocfg.get_service_info("_snapcast._tcp.local.",
+                                            "Snapcast._snapcast._tcp.local.",
+                                            3000)
+    logging.info(service_info)
     if service_info is None:
         logging.error("Failed to obtain snapserver address through zeroconf!")
         return None

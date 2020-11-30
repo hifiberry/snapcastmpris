@@ -14,7 +14,7 @@ REQ_TAG_GET_SERVER_STATUS = 6
 
 class SnapcastRpcWrapper:
 
-    def __init__(self, server_address):
+    def __init__(self, server_address, server_control_port):
         """
         Create a new instance
 
@@ -23,7 +23,8 @@ class SnapcastRpcWrapper:
         """
         logging.debug("Initializing SnapcastRpcWrapper")
         self.server_address = server_address
-        self.client_id = SnapcastRpcWrapper.get_client_id()
+        self.server_control_port = server_control_port
+        self.client_id = self.get_client_id()
         self.verify_srver_rpc_version()
         logging.debug("Initialized SnapcastRpcWrapper")
 
@@ -34,7 +35,7 @@ class SnapcastRpcWrapper:
              "jsonrpc": "2.0",
              "method": "Server.GetStatus",
              }
-        return self.call_snapserver_jsonrcp(payload)["params"]
+        return self.call_snapserver_jsonrcp(payload)
 
     def get_status(self):
         logging.info("Getting snapclient status")
@@ -44,7 +45,7 @@ class SnapcastRpcWrapper:
              "method": "Client.GetStatus",
              "params": {"id": self.client_id}
              }
-        return self.call_snapserver_jsonrcp(payload)["params"]
+        return self.call_snapserver_jsonrcp(payload)
 
     def unmute(self):
         logging.info("Unmuting snapclient")
@@ -114,14 +115,13 @@ class SnapcastRpcWrapper:
 
     def call_snapserver_jsonrcp(self, payload_data):
         logging.debug("Sending JsonRPC call to Snapserver at " + self.server_address)
-        response = requests.post('http://' + self.server_address + ":1780/jsonrpc", json=payload_data)
+        response = requests.post('http://' + self.server_address + ":" + str(self.server_control_port) +"/jsonrpc", json=payload_data)
         logging.debug("JsonRCP response: " + response.text)
         return response.json()['result']
 
-    @staticmethod
-    def get_client_id():
-        # TODO: what if there is more than one active interface?
+    def get_client_id(self):
         logging.info("Finding MAC address of active interface to use as snapclient id")
+        addresses = list()
         for interface in listdir("/sys/class/net/"):
             if interface == "lo":
                 continue
@@ -132,9 +132,31 @@ class SnapcastRpcWrapper:
                     continue
                 mac = open('/sys/class/net/' + interface + '/address').readline()
                 logging.info(f"MAC address for interface {interface}: {mac[0:17]}")
-                return mac[0:17]
+                addresses.append(mac[0:17])
             except:
                 pass
 
-        logging.critical("Failed to find MAC address of active network adapter")
-        exit(1)
+        if len(addresses) == 0:
+            logging.critical("Failed to find MAC address of active network adapter")
+            exit(1)
+        elif len(addresses) == 1:
+            logging.info("Single MAC address: " + addresses[0])
+            return addresses[0]
+        else:
+            logging.info("Multiple MAC addresses, determining id")
+            snapcast_clients = dict()
+            response = self.get_server_status()
+            for group in response['server']['groups']:
+                for client in group['clients']:
+                    if not client['connected']:
+                        logging.info("Client " + client['id'] + " is currently disconnected"
+                                     + " (was connected to " + group['stream_id'] + ")")
+                        continue
+                    logging.info(
+                        "Client " + client['id'] + " is connected to stream " + group['stream_id'])
+                    snapcast_clients[client['id']] = group['stream_id']
+
+            for address in addresses:
+                if address in snapcast_clients.keys():
+                    logging.info("Found mac address registered in snapserver: " + address)
+                    return address

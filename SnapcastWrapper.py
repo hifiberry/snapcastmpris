@@ -4,6 +4,7 @@ import time
 import threading
 import subprocess
 import select
+from zeroconf import Zeroconf, IPVersion
 from SnapcastMPRISInterface import SnapcastMPRISInterface
 from SnapcastRpcListener import SnapcastRpcListener
 from SnapcastRpcWebsocketWrapper import SnapcastRpcWebsocketWrapper
@@ -26,16 +27,30 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
         self.server_address = server_address
 
         self.dbus_service = SnapcastMPRISInterface(self, glib_loop)
-        self.rpc_wrapper = SnapcastRpcWrapper(server_address)
-        self.websocket_wrapper = SnapcastRpcWebsocketWrapper(server_address, self)
 
         self.playback_status = PLAYBACK_STOPPED
         self.metadata = {}
-
-        self.snapclient = None
-        self.start_snapclient_process()
         self.stream_name = ""
         self.stream_group = ""
+
+        self.server_streaming_port = self.get_zeroconf_server_stream_port()
+        # Start snapclient before the rpc service, to ensure snapclient can register with the server first
+        self.snapclient = None
+        self.start_snapclient_process()
+        # Give the client some time to register
+        time.sleep(2)
+
+        self.server_control_port = 1780  # This port cannot be determined through zeroconf
+        self.rpc_wrapper = SnapcastRpcWrapper(
+            server_address,
+            self.server_control_port
+        )
+        self.websocket_wrapper = SnapcastRpcWebsocketWrapper(
+            server_address,
+            self.rpc_wrapper.client_id,
+            self.server_control_port,
+            self
+        )
 
         self.sync_volume = sync_volume
         if self.sync_volume:
@@ -95,10 +110,12 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
 
     def start_snapclient_process(self):
         logging.info("starting Snapclient")
+        server_address_flag = ""
         if self.server_address is not None:
             server_address_flag = "-h " + self.server_address
-        else:
-            server_address_flag = ""
+        if self.server_streaming_port is not None:
+            server_address_flag += "-p " + str(self.server_streaming_port)
+
         self.snapclient = \
             subprocess.Popen(f"/bin/snapclient -e {server_address_flag}",
                              stdout=subprocess.DEVNULL,
@@ -229,3 +246,15 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
 
         self.dbus_service.update_property('org.mpris.MediaPlayer2.Player',
                                           'Metadata')
+
+    def get_zeroconf_server_stream_port(self):
+        zerocfg = Zeroconf()
+        service_info = zerocfg.get_service_info("_snapcast._tcp.local.",
+                                                "Snapcast._snapcast._tcp.local.",
+                                                3000)
+        logging.debug(service_info)
+        if service_info is None or service_info.parsed_addresses(IPVersion.All)[0] != self.server_address:
+            logging.warning("Failed to obtain snapserver streaming port through zeroconf!")
+            return 1704
+        logging.info("Obtained snapserver streaming port through zeroconf: " + str(service_info.port))
+        return service_info.port
