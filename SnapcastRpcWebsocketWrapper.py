@@ -14,16 +14,17 @@ RPC_EVENT_STREAM_UPDATE = "Stream.OnUpdate"
 
 class SnapcastRpcWebsocketWrapper:
 
-    def __init__(self, server_address: str, listener: SnapcastRpcListener):
+    def __init__(self, server_address: str, server_control_port, client_id, listener: SnapcastRpcListener):
         self.healthy = True
         self.server_address = server_address
-        self.client_id = SnapcastRpcWrapper.get_client_id()
+        self.server_control_port = server_control_port
+        self.client_id = client_id
         self.listener = listener
 
         self.current_volume = None
 
         self.websocket = websocket.WebSocketApp(
-            "ws://" + server_address + ":1780/jsonrpc",
+            "ws://" + server_address + ":" + str(server_control_port) + "/jsonrpc",
             on_message=self.on_ws_message,
             on_error=self.on_ws_error,
             on_close=self.on_ws_close,
