@@ -110,14 +110,14 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
 
     def start_snapclient_process(self):
         logging.info("starting Snapclient")
-        server_address_flag = ""
+        cmd = ["/bin/snapclient", "-e"]
         if self.server_address is not None:
-            server_address_flag = "-h " + self.server_address
+            cmd += ["-h", self.server_address]
         if self.server_streaming_port is not None:
-            server_address_flag += "-p " + str(self.server_streaming_port)
+            cmd += ["-p", str(self.server_streaming_port)]
 
         self.snapclient = \
-            subprocess.Popen(f"/bin/snapclient -e {server_address_flag}",
+            subprocess.Popen(" ".join(cmd),
                              stdout=subprocess.DEVNULL,
                              stderr=subprocess.DEVNULL,
                              shell=True)
