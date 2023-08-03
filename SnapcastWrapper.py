@@ -90,10 +90,7 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
     def start_playback(self):
         self.playback_status = PLAYBACK_PLAYING
         self.pause_other_players()
-        if self.snapclient is None:
-            self.start_snapclient_process()
-        else:
-            logging.info("snapcast process is already running")
+        self.start_snapclient_process()
         self.update_dbus()
         # Give snapclient a bit of time to register with the server
         time.sleep(0.5)
@@ -109,6 +106,10 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
         subprocess.run(["/opt/hifiberry/bin/pause-all", "snapcast"])
 
     def start_snapclient_process(self):
+        if self.snapclient is not None:
+            logging.info("snapcast process is already running")
+            return
+
         logging.info("starting Snapclient")
         cmd = ["/bin/snapclient", "-e"]
         if self.server_address is not None:
