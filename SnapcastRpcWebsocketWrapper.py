@@ -38,7 +38,7 @@ class SnapcastRpcWebsocketWrapper:
         self.websocket.run_forever()
         logging.info("Ending SnapcastRpcWebsocketWrapper loop")
 
-    def on_ws_message(self, message):
+    def on_ws_message(self, object, message):
         logging.debug("Snapcast RPC websocket message received")
         logging.debug(message)
         json_data = json.loads(message)
@@ -121,11 +121,11 @@ class SnapcastRpcWebsocketWrapper:
         return params["id"] == self.client_id
 
     # noinspection PyMethodMayBeStatic
-    def on_ws_error(self, error):
+    def on_ws_error(self, object, error):
         logging.error("Snapcast RPC websocket error")
         logging.error(error)
 
-    def on_ws_close(self):
+    def on_ws_close(self, message):
         logging.info("Snapcast RPC websocket closed!")
         self.healthy = False
 
