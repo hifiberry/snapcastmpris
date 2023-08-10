@@ -101,7 +101,10 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
 
     def autostart_on_stream(self):
         self.playback_status = PLAYBACK_PAUSED
-        self.start_snapclient_process()
+        if self.snapclient is None:
+            self.start_snapclient_process()
+        else:
+            logging.info("snapcast process is already running")
         self.update_dbus()
 
     def pause_other_players(self):
