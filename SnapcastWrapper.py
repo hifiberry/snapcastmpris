@@ -47,8 +47,8 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
         )
         self.websocket_wrapper = SnapcastRpcWebsocketWrapper(
             server_address,
-            self.rpc_wrapper.client_id,
             self.server_control_port,
+            self.rpc_wrapper.client_id,
             self
         )
 
