@@ -20,7 +20,7 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
     """ Wrapper to handle snapclient
     """
 
-    def __init__(self, glib_loop, server_address: str, sync_volume=False):
+    def __init__(self, glib_loop, server_address: str, sync_volume=False, alsa_mixer='Softvol'):
         super().__init__()
         self.name = "SnapcastWrapper"
         self.keep_running = True
@@ -52,6 +52,7 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
             self
         )
 
+        self.alsa_mixer = alsa_mixer
         self.sync_volume = sync_volume
         if self.sync_volume:
             # Import alsa only when needed, to ensure this code can still run on other platforms
@@ -209,7 +210,7 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
 
     def poll_system_volume_loop(self):
         logging.info("SnapcastWrapper ALSA volume poll thread started")
-        mixer = self.alsa.Mixer('Softvol')
+        mixer = self.alsa.Mixer(self.alsa_mixer)
         descriptors = mixer.polldescriptors()
         fd = descriptors[0][0]
         event_mask = descriptors[0][1]
@@ -233,12 +234,12 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
             return
         # Import alsa locally to be system-independent
 
-        mixer = self.alsa.Mixer('Softvol')
+        mixer = self.alsa.Mixer(self.alsa_mixer)
         mixer.setvolume(volume_level, self.alsa.MIXER_CHANNEL_ALL, self.alsa.PCM_PLAYBACK)
         self.current_volume = volume_level
 
     def get_system_volume(self):
-        mixer = self.alsa.Mixer('Softvol')
+        mixer = self.alsa.Mixer(self.alsa_mixer)
         return mixer.getvolume(self.alsa.PCM_PLAYBACK)[0]
 
     def update_metadata(self):

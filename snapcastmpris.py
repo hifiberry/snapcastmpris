@@ -33,6 +33,8 @@ import logging
 import time
 import signal
 import configparser
+import argparse
+
 from SnapcastWrapper import SnapcastWrapper
 from zeroconf import Zeroconf, IPVersion
 
@@ -100,22 +102,49 @@ def get_zeroconf_server_address():
 if __name__ == '__main__':
     DBusGMainLoop(set_as_default=True)
 
-    volume_sync_enabled = False
-    if len(sys.argv) > 1:
-        if "-v" in sys.argv:
-            logging.basicConfig(format='%(levelname)s: %(name)s - %(message)s',
-                                level=logging.DEBUG)
-            logging.debug("enabled verbose logging")
-        else:
-            logging.basicConfig(format='%(levelname)s: %(name)s - %(message)s',
-                                level=logging.INFO)
+    # Parse arguments
+    parser = argparse.ArgumentParser(
+                    prog='snapcastmpris',
+                    description='A wrapper around the Snapclient binary and the Snapserver RPC API. It exposes the current playing state on the desktop bus (D-BUS), and allows control through the DBUS play/pause/stop signals.')
 
-        if "--sync-alsa-volume" in sys.argv:
-            logging.debug("Volume sync flag set")
-            volume_sync_enabled = True
+    parser.add_argument(
+        '-v', '--verbose',
+                    action='store_true', 
+                    help='enabled verbose logging')
+
+    parser.add_argument(
+        '-s', '--sync_alsa_volume', 
+        action='store_true',
+        help='enable synchronization with alsa volume')
+
+    parser.add_argument(
+        '-m', '--mixer', 
+        default='Softvol',
+        type=str,
+        help='set custom mixer for alsa')
+
+    args = parser.parse_args()
+
+    # Set dubug logging
+    if args.verbose == True:
+        logging.basicConfig(format='%(levelname)s: %(name)s - %(message)s',
+                            level=logging.DEBUG)
+        logging.debug("enabled verbose logging via argv")
     else:
         logging.basicConfig(format='%(levelname)s: %(name)s - %(message)s',
                             level=logging.INFO)
+
+    # Set alsa volume synchronization
+    volume_sync_enabled = False
+    if args.sync_alsa_volume == True:
+        volume_sync_enabled = True
+        logging.debug("volume sync flag set via argv to True")
+
+    mixer = 'Softvol'
+    # Debug output for alsa mixer
+    if not args.mixer == 'Softvol':
+        mixer = args.mixer;
+        logging.debug("alsa mixer changed via argv to " + mixer)
 
     # Set up the main loop
     glib_main_loop = GLib.MainLoop()
@@ -142,8 +171,18 @@ if __name__ == '__main__':
             # If no address was defined, and zeroconf failed to get one, we can't launch
             logging.critical("Snapcast cannot be launched: failed to obtain snapcast server address.")
             exit(1)
+        
+        # Set alsa mixer
+        if config.has_option("snapcast", "alsa-mixer"):
+            mixer = config.get("snapcast", "alsa-mixer")
+            logging.debug("alsa mixer set via config to " + mixer)
 
-        snapcast_wrapper = SnapcastWrapper(glib_main_loop, server_address, sync_volume=volume_sync_enabled)
+        # Set volume sync with alsa
+        if not volume_sync_enabled == True and config.has_option("snapcast", "sync-alsa-volume"):
+            volume_sync_enabled = config.getboolean("snapcast", "sync-alsa-volume", fallback=False);
+            logging.debug("volume sync flag set via config to {}".format(volume_sync_enabled))
+
+        snapcast_wrapper = SnapcastWrapper(glib_main_loop, server_address, sync_volume=volume_sync_enabled, alsa_mixer=args.mixer)
 
         # Auto start for snapcast
         if config.getboolean("snapcast", "autostart", fallback=True):

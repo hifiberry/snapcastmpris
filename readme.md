@@ -18,15 +18,13 @@ is used to control the snapcast audio level, mute status, client name. The `Snap
 events from [the Snapserver RPC API](https://github.com/badaix/snapcast/blob/master/doc/json_rpc_api/v2_0_0.md). It receives 
 information about the stream that is currently playing, such as the playing state and the name, and passes this on to 
 the `SnapcastWrapper`. Volume level changes, muting of a client, client connects, disconnects, ... is handled by this 
-websocket wrapper as well. `SnapcastMPRISInterface` is used to communicate through the DBUS, to receive play/pause/stop 
-signals from the OS and to relay information about the current state back to the OS. 
+websocket wrapper as well. `SnapcastMPRISInterface` is used to communicate through the DBUS, to receive play/pause/stop signals from the OS and to relay information about the current state back to the OS. 
 
 ## What SnapcastWrapper does
 SnapcastWrapper runs in a separate thread from the main script.
 SnapcastWrapper implements the SnapcastRpcListener class and methods, which are called by SnapcastRpcWebsocketWrapper.
 When ALSA <=> Snapclient volume synchronisation is enabled, SnapcastWrapper will monitor the ALSA volume level and send
-any changes to Snapserver through SnapcastRPCWrapper. Volume synchronisation is disabled by default and enabled through 
-the `--sync-alsa-volume` flag. It requires the `alsaaudio` library to be installed.
+any changes to Snapserver through SnapcastRPCWrapper. Volume synchronisation is disabled by default and enabled through the `--sync_alsa_volume` or `-s` flag or via the configuration with `sync-alsa-volume = 1`. It requires the `alsaaudio` library to be installed. Also the ALS mixer can be provided through the `-m` or `--mixer` flag or via the configuration with `alsa-mixer = Softvol`.
 
 ### Playing audio
 When playing audio
