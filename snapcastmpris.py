@@ -42,7 +42,7 @@ import dbus.service
 from dbus.mainloop.glib import DBusGMainLoop
 
 try:
-    from gi.repository import GLib
+    from gi.repository import GLib, GObject
 
     using_gi_glib = True
 except ImportError:
