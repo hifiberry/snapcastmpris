@@ -64,10 +64,9 @@ def read_config():
     try:
         with open("/etc/snapcastmpris.conf") as f:
             config.read_string("[snapcast]\n" + f.read())
-        logging.info("read /etc/snapcastclient.conf")
+        logging.info("read /etc/snapcastmpris.conf")
     except:
-        logging.info("can't read /etc/snapcastclient.conf, using default configurations")
-        config = {"general": {}}
+        logging.info("can't read /etc/snapcastmpris.conf, using default configurations")
 
     return config
 
