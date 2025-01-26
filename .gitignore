@@ -2,3 +2,7 @@
 .pydevproject
 .settings/
 update
+build
+deb/
+dist/
+snapcastmpris.egg-info/
