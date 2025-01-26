@@ -4,5 +4,8 @@
 update
 build
 deb/
+deb_dist/
+debian/
+snapcastmpris*.tar.gz
 dist/
 snapcastmpris.egg-info/
