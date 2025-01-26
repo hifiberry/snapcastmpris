@@ -6,7 +6,7 @@ import subprocess
 import json
 import signal
 import dbus.service
-import SnapcastWrapper
+import snapcastmpris.SnapcastWrapper
 
 
 class SnapcastMPRISInterface(dbus.service.Object):

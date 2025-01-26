@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 import os
 
 # Project description
@@ -20,9 +20,8 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown" if os.path.exists("readme.md") else "text/plain",
     url="https://github.com/hifiberry/snapcastmpris",
-    packages=find_packages(exclude=["build", "dist", "deb", "*.egg-info"]),
-    package_dir={"snapcastmpris": "snapcastmpris"},
-    py_modules=["snapcastmpris.snapcastmpris"],  # Adjust if snapcastmpris.py contains the main entry point
+    packages=["snapcastmpris"],  # Only include the snapcastmpris module
+    package_dir={"snapcastmpris": "snapcastmpris"},  # Map the snapcastmpris directory
     entry_points={
         "console_scripts": [
             "snapcastmpris=snapcastmpris.snapcastmpris:main",  # Replace `main` with the entry function
@@ -37,6 +36,7 @@ setup(
     install_requires=[
         "pydbus",
         "PyGObject",
+        "websocket-client",
     ],
     extras_require={
         "dev": ["pytest", "flake8"],
