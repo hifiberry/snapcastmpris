@@ -9,7 +9,7 @@ import signal
 import configparser
 import argparse
 
-from snapcastmpris.SnapcastWrapper import SnapcastWrapper
+from SnapcastWrapper import SnapcastWrapper
 from zeroconf import Zeroconf, IPVersion
 
 import dbus.service

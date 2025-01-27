@@ -5,10 +5,10 @@ import threading
 import subprocess
 import select
 from zeroconf import Zeroconf, IPVersion
-from snapcastmpris.SnapcastMPRISInterface import SnapcastMPRISInterface
-from snapcastmpris.SnapcastRpcListener import SnapcastRpcListener
-from snapcastmpris.SnapcastRpcWebsocketWrapper import SnapcastRpcWebsocketWrapper
-from snapcastmpris.SnapcastRpcWrapper import SnapcastRpcWrapper
+from SnapcastMPRISInterface import SnapcastMPRISInterface
+from SnapcastRpcListener import SnapcastRpcListener
+from SnapcastRpcWebsocketWrapper import SnapcastRpcWebsocketWrapper
+from SnapcastRpcWrapper import SnapcastRpcWrapper
 
 PLAYBACK_STOPPED = "stopped"
 PLAYBACK_PAUSED = "pause"
@@ -114,12 +114,12 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
 
     def start_snapclient_process(self):
         logging.info("starting Snapclient")
-        cmd = ["/bin/snapclient", "-e"]
+        cmd = ["snapclient", "-e"]
         if self.server_address is not None:
             cmd += ["-h", self.server_address]
         if self.server_streaming_port is not None:
             cmd += ["-p", str(self.server_streaming_port)]
-
+        logging.info("starting snapcast with command" + str(cmd))
         self.snapclient = \
             subprocess.Popen(" ".join(cmd),
                              stdout=subprocess.DEVNULL,
