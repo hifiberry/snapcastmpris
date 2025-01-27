@@ -119,7 +119,7 @@ class SnapcastWrapper(threading.Thread, SnapcastRpcListener):
             cmd += ["-h", self.server_address]
         if self.server_streaming_port is not None:
             cmd += ["-p", str(self.server_streaming_port)]
-
+        logging.info("starting snapcast with command" + str(cmd))
         self.snapclient = \
             subprocess.Popen(" ".join(cmd),
                              stdout=subprocess.DEVNULL,
