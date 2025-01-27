@@ -5,10 +5,10 @@ import threading
 import subprocess
 import select
 from zeroconf import Zeroconf, IPVersion
-from snapcastmpris.SnapcastMPRISInterface import SnapcastMPRISInterface
-from snapcastmpris.SnapcastRpcListener import SnapcastRpcListener
-from snapcastmpris.SnapcastRpcWebsocketWrapper import SnapcastRpcWebsocketWrapper
-from snapcastmpris.SnapcastRpcWrapper import SnapcastRpcWrapper
+from SnapcastMPRISInterface import SnapcastMPRISInterface
+from SnapcastRpcListener import SnapcastRpcListener
+from SnapcastRpcWebsocketWrapper import SnapcastRpcWebsocketWrapper
+from SnapcastRpcWrapper import SnapcastRpcWrapper
 
 PLAYBACK_STOPPED = "stopped"
 PLAYBACK_PAUSED = "pause"
